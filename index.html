@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spotyy — Find Places Near You</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+  <style>
+    :root {
+      --bg: #0e0e0e;
+      --surface: #161616;
+      --surface2: #1f1f1f;
+      --border: #2a2a2a;
+      --accent: #e8a317;
+      --accent2: #ff6b35;
+      --text: #f0ede8;
+      --muted: #6b6660;
+      --danger: #e84040;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text);
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      opacity: 0.72;
+      pointer-events: none;
+    }
+
+    .asset-img { display: none; }
+
+    /* ── Login Panel ── */
+    .login-wrap {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      pointer-events: none; /* let mouse events reach canvas */
+    }
+
+    .login-card {
+      pointer-events: all; /* re-enable clicks on the card */
+    }
+
+    .login-card {
+      pointer-events: all;
+      width: 100%;
+      max-width: 768px;
+      animation: cardIn 0.7s cubic-bezier(0.16,1,0.3,1) both;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(30px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .brand {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
+    .brand-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+    }
+
+    .brand-tagline {
+      font-size: 0.82rem;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-top: 6px;
+    }
+
+    .pin-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-right: 5px;
+      vertical-align: middle;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    /* ── Sliding auth (dark themed) ── */
+    #container {
+      background: rgba(14,14,14,0.88);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      max-width: 768px;
+      min-height: 500px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 0 80px rgba(232,163,23,0.06), 0 32px 64px rgba(0,0,0,0.6);
+    }
+
+    #container p {
+      font-size: 14px;
+      line-height: 1.45;
+      letter-spacing: 0.02em;
+      margin: 16px 0;
+      color: rgba(255,255,255,0.88);
+    }
+
+    #container span.form-hint {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    #container a.link-muted {
+      color: var(--muted);
+      font-size: 13px;
+      text-decoration: none;
+      margin: 12px 0 8px;
+      transition: color 0.2s;
+    }
+    #container a.link-muted:hover { color: var(--accent); }
+
+    #container form button[type="button"].btn-submit {
+      width: 100%;
+      margin-top: 8px;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #0e0e0e;
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      box-shadow: 0 4px 20px rgba(232,163,23,0.3);
+      text-transform: none;
+    }
+
+    #container form button[type="button"].btn-submit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(232,163,23,0.45);
+    }
+
+    #container form button[type="button"].btn-submit:active { transform: translateY(0); }
+
+    #container button.ghost-toggle {
+      background-color: transparent;
+      border: 1px solid rgba(255,255,255,0.85);
+      color: #fff;
+      font-size: 12px;
+      padding: 10px 45px;
+      border-radius: 8px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-top: 10px;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    #container button.ghost-toggle:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    #container form {
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 0 36px;
+      height: 100%;
+    }
+
+    #container form h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    #container input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      margin: 8px 0;
+      padding: 12px 15px;
+      font-size: 14px;
+      border-radius: 10px;
+      width: 100%;
+      outline: none;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    #container input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(232,163,23,0.12);
+    }
+
+    #container input::placeholder { color: var(--muted); }
+
+    .form-container {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      transition: transform 0.6s ease-in-out, opacity 0.45s ease, visibility 0.45s ease;
+      background: rgba(18, 18, 18, 0.98);
+      overflow: hidden;
+    }
+
+    .sign-in {
+      left: 0;
+      width: 50%;
+      z-index: 2;
+      transform: translateX(0);
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    #container.active .sign-in {
+      transform: translateX(100%);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .sign-up {
+      left: 0;
+      width: 50%;
+      z-index: 1;
+      transform: translateX(0);
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    #container.active .sign-up {
+      transform: translateX(100%);
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      z-index: 5;
+    }
+
+    .social-icons {
+      margin: 16px 0 12px;
+    }
+
+    .social-icons a.icon {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      margin: 0 4px;
+      width: 40px;
+      height: 40px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s, border-color 0.2s, background 0.2s;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .social-icons a.icon i {
+      font-style: normal;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .social-icons a.icon:hover {
+      color: var(--accent);
+      border-color: rgba(232,163,23,0.45);
+      background: rgba(232,163,23,0.06);
+    }
+
+    .toggle-container {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 50%;
+      height: 100%;
+      overflow: hidden;
+      transition: all 0.6s ease-in-out;
+      border-radius: 0 120px 100px 0;
+      z-index: 1000;
+    }
+
+    #container.active .toggle-container {
+      transform: translateX(-100%);
+      border-radius: 120px 0 0 100px;
+    }
+
+    .toggle {
+      height: 100%;
+      background: linear-gradient(120deg, #3d2e0a 0%, var(--accent2) 45%, var(--accent) 100%);
+      color: #0e0e0e;
+      position: relative;
+      left: -100%;
+      width: 200%;
+      transform: translateX(0);
+      transition: all 0.6s ease-in-out;
+    }
+
+    #container.active .toggle {
+      transform: translateX(50%);
+    }
+
+    .toggle-panel {
+      position: absolute;
+      width: 50%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      padding: 0 22px;
+      text-align: center;
+      top: 0;
+      transition: all 0.6s ease-in-out;
+      box-sizing: border-box;
+    }
+
+    .toggle-panel h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.15rem, 2.5vw, 1.45rem);
+      font-weight: 800;
+      color: #0e0e0e;
+      line-height: 1.25;
+      max-width: 100%;
+      word-wrap: break-word;
+    }
+
+    .toggle-panel p {
+      color: rgba(14,14,14,0.82) !important;
+    }
+
+    .toggle-left {
+      transform: translateX(-200%);
+    }
+
+    #container.active .toggle-left {
+      transform: translateX(0);
+    }
+
+    .toggle-right {
+      right: 0;
+      transform: translateX(0);
+    }
+
+    #container.active .toggle-right {
+      transform: translateX(200%);
+    }
+
+    .error-msg {
+      font-size: 0.82rem;
+      color: var(--danger);
+      margin-bottom: 8px;
+      min-height: 18px;
+      text-align: center;
+      width: 100%;
+    }
+
+    .location-note {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(232,163,23,0.07);
+      border: 1px solid rgba(232,163,23,0.18);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      color: rgba(232,163,23,0.85);
+      margin-top: 20px;
+    }
+
+    .location-note svg { flex-shrink: 0; }
+
+    @media (max-width: 720px) {
+      .sign-in, .sign-up { width: 100%; }
+      #container { min-height: auto; }
+      .toggle-container {
+        display: none;
+      }
+      .sign-up {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateX(100%);
+      }
+      #container.active .sign-up {
+        transform: translateX(0);
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        left: 0;
+      }
+      #container.active .sign-in {
+        transform: translateX(-100%);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .sign-in {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+      .mobile-switch {
+        display: flex !important;
+      }
+    }
+
+    .mobile-switch {
+      display: none;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .mobile-switch button {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  </style>
+</head>
+<body>
+
+<img class="asset-img" id="light-img" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABkAAAAZCAMAAADzN3VRAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAACnVBMVEUAAAD40ED40D740Dv40En40Dr40FH40Df40D/40D340Dn40Dz40Dj40AD40Ff40Db40DT40EH40EL40ED40ED40Dv40D/4zz/4zz74zz/4zz/40D74zz/4zz/4zz/40UH40kD40UL40kH4zz/4zz340D34zz740kH41UT410f410j410j410f40D/40D/4zz/40ED40EH400T410f42Er4103410/411D41UT40kH40D/4z0D4zz/41UX410j42E7411L42Ff42Vv42Vz42En41kb40UH4zz/40Dz40ED41UT42Ej4107411b42l743WT432r4323432r410/42En4zz340Dn400H410f42mD432v44nf45IP45Yn45IT44nj432r411b400L40D/4zz/41UT42Er411P432v44oD46Zv47q/48Lj46Zr432n40UH410f42Ff44nf48r/499T4997499T48r744nf43WP40D741EH42Vv4+O34+PP4+O347q745IL432j40UD432345Yj48LX49934+PP4+Pj4993477T45Ib432z411D400D40D/40UH432n45IP47a7432j42Vv410/400H40Dr4zz340UD410b410346Zj48r343WP42Ff410f40D/41kT42Er42l744nv46Zf42l3411L410r41kX40ED410f42E7411b421/45IL45Ib432n421740UH40D340Dz4zz741EP410j410743WT432f432v43mj43GT42Ej41kT4zz740ED41EX411P42Ff42Fv411f410j41kX400P41034107411D42E340D740UH410j41kb41ET400H40D/40ED4z0D4zz74zz340D////+WdN8lAAAA3nRSTlMAAAAAAAAAAAAAAAAAAAAAAAAAAgMCBAcJDAkDCA0SFRsbGxMDBQscJSwwMS0SDAUFFyExQExUVyIYDQULJzlOZHeDhDonFwoDASE5VXGNpbO4tFM5BwEcMJa3zdjb2Mu2cBwDESM+Y7bU4ebo4bUUK3bL6vDy7+rKogIZgPb49ebXsBu02+jx9/jw6Nu0VRsBGbDX5q9/UhkCCRUqS+HqoHMqESI9i9Thi2E9IhEvTG+V1tq0kxsDAQchN1Ggr7SvoDghChUjYXJ/cjgnIUlSVEkFGi8qIhsFFAcICAaJi/ApAAAAAWJLR0Te6W7imwAAAAd0SU1FB+YMHBEUINvSacMAAAIKSURBVCjPY2AgBBgZmZiFRYQZgQBVnEVUTFxCUlJSSlxMlAVJjplVWkZWTl5BUUleWVZGhZkZYZKqmpy6hqaWtpaOhrqunj7MREZGA1lDI2MTUzNzM1MTYwtLK2uIFCOjiI2hrZ29g6OTs5Ojg72Lq5u7Bxs7SMZTXNfL28fXzz8gMMjfzzc4xEI3NIwVrEUyPMLeNzIqOiY2Lj4hMtE+Ikk2mYkRKCOekpqW7peRmZWdk52bmeeXnqYhJ84BkpHKLzAt9C/KKi4pLSvPragsNNXMl/JkZGCqUqvWMqsJiMkuqa2rL2tobKox06qWTOZg4EiWbNY2d25pbWvv6Ozo6u7pde7T6pf04GTgmGAzEahn0uSGsvqO+rIpjVOnTdeaoTaTmYGLfdbsOXMLKyvmzS/rKps/r2jBwrmL5KWAfmViEl+8ZGn6srzlK6Z0T1mxPG/lqtVr1oLdxp0sqbRu/YaNeUWbNm8q2rJ1w/p12yS38wDDh3PHTrldu/dsWLZ33/4DB5dt2HPosO7OMFBwM/KKHjl6bPf64yemOZ88dXz96TPyR6T5+EFByi6ganP07LrV585fmH5x6bqzs21UmZhg0XDJXe7ykjnrtK5cvXZdzv0GMycs6jiZpXdKLs532+Z2M0VSXAQ5KTAKeorcuu1uc+TO3e07hNDSCCMjNyczKz8nN8FkxgAAgH2hXtQzzA4AAAAldEVYdGRhdGU6Y3JlYXRlADIwMjItMTItMjhUMTc6MjA6MzIrMDA6MDA1MNVoAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDIyLTEyLTI4VDE3OjIwOjMyKzAwOjAwRG1t1AAAAABJRU5ErkJggg==">
+<canvas></canvas>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-name">spotyy</div>
+      <div class="brand-tagline"><span class="pin-dot"></span>India's Place Finder</div>
+    </div>
+
+    <div class="container" id="container">
+      <div class="form-container sign-up">
+        <form action="#" onsubmit="return false;">
+          <h1>Create Account</h1>
+          <div class="social-icons">
+            <a href="#" class="icon" aria-label="Google" onclick="event.preventDefault(); socialAuth('google')"><i class="fa-brands fa-google" aria-hidden="true"></i></a>
+            <a href="#" class="icon" aria-label="Facebook" onclick="event.preventDefault(); socialAuth('facebook')"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+            <a href="#" class="icon" aria-label="GitHub" onclick="event.preventDefault(); socialAuth('github')"><i class="fa-brands fa-github" aria-hidden="true"></i></a>
+            <a href="#" class="icon" aria-label="LinkedIn" onclick="event.preventDefault(); socialAuth('linkedin')"><i class="fa-brands fa-linkedin-in" aria-hidden="true"></i></a>
+          </div>
+          <span class="form-hint">or use your email to register</span>
+          <input type="text" id="reg-name" placeholder="Name" autocomplete="name">
+          <input type="email" id="reg-email" placeholder="Email" autocomplete="email">
+          <input type="password" id="reg-pass" placeholder="Password (min 6 characters)" autocomplete="new-password">
+          <div class="error-msg" id="reg-error"></div>
+          <button type="button" class="btn-submit" onclick="doRegister()">Sign Up</button>
+        </form>
+      </div>
+      <div class="form-container sign-in">
+        <form action="#" onsubmit="return false;">
+          <h1>Sign In</h1>
+          <div class="social-icons">
+            <a href="#" class="icon" aria-label="Google" onclick="event.preventDefault(); socialAuth('google')"><i class="fa-brands fa-google" aria-hidden="true"></i></a>
+            <a href="#" class="icon" aria-label="Facebook" onclick="event.preventDefault(); socialAuth('facebook')"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i></a>
+            <a href="#" class="icon" aria-label="GitHub" onclick="event.preventDefault(); socialAuth('github')"><i class="fa-brands fa-github" aria-hidden="true"></i></a>
+            <a href="#" class="icon" aria-label="LinkedIn" onclick="event.preventDefault(); socialAuth('linkedin')"><i class="fa-brands fa-linkedin-in" aria-hidden="true"></i></a>
+          </div>
+          <span class="form-hint">or use your email and password</span>
+          <input type="email" id="login-email" placeholder="Email" autocomplete="email">
+          <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+          <a href="#" class="link-muted">Forgot your password?</a>
+          <div class="error-msg" id="login-error"></div>
+          <button type="button" class="btn-submit" onclick="doLogin()">Sign In</button>
+        </form>
+      </div>
+      <div class="toggle-container">
+        <div class="toggle">
+          <div class="toggle-panel toggle-left">
+            <h1>Welcome Back!</h1>
+            <p>Enter your details to use all site features</p>
+            <button type="button" class="ghost-toggle" id="login">Sign In</button>
+          </div>
+          <div class="toggle-panel toggle-right">
+            <h1>Hello, Friend!</h1>
+            <p>Register with your details to use all site features</p>
+            <button type="button" class="ghost-toggle" id="register">Sign Up</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="mobile-switch" id="mobile-switch">
+      <span id="mobile-switch-label">New here?</span>
+      <button type="button" id="mobile-toggle-auth">Create an account</button>
+    </p>
+
+    <div class="location-note">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      Location access required for India-based search
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Vector ───────────────────────────────────────────
+class Vector {
+  constructor(x,y){this.x=x||0;this.y=y||0}
+  static add(a,b){return new Vector(a.x+b.x,a.y+b.y)}
+  static sub(a,b){return new Vector(a.x-b.x,a.y-b.y)}
+  add(x,y){if(arguments.length===1){this.x+=x.x;this.y+=x.y}else{this.x+=x;this.y+=y}return this}
+  mult(v){if(typeof v==='number'){this.x*=v;this.y*=v}else{this.x*=v.x;this.y*=v.y}return this}
+  setXY(x,y){this.x=x;this.y=y;return this}
+  dist(v){const dx=this.x-v.x,dy=this.y-v.y;return Math.sqrt(dx*dx+dy*dy)}
+}
+
+// ─── Mouse ────────────────────────────────────────────
+class Mouse {
+  constructor(canvas){
+    this.pos=new Vector(-1000,-1000);this.radius=40;
+    // Track on window so card overlay doesn't block events
+    window.addEventListener('mousemove',e=>this.pos.setXY(e.clientX,e.clientY));
+    window.addEventListener('touchmove',e=>{this.pos.setXY(e.touches[0].clientX,e.touches[0].clientY)},{passive:true});
+    window.addEventListener('touchcancel',()=>this.pos.setXY(-1000,-1000));
+    window.addEventListener('touchend',()=>this.pos.setXY(-1000,-1000));
+  }
+}
+
+// ─── Dot ──────────────────────────────────────────────
+class Dot {
+  constructor(x,y){
+    this.pos=new Vector(x,y);this.oldPos=new Vector(x,y);
+    this.friction=0.97;this.gravity=new Vector(0,0.6);this.mass=1;this.pinned=false;
+    this.lightImg=document.querySelector('#light-img');this.lightSize=15;
+  }
+  update(mouse){
+    if(this.pinned)return;
+    let vel=Vector.sub(this.pos,this.oldPos);
+    this.oldPos.setXY(this.pos.x,this.pos.y);
+    vel.mult(this.friction);vel.add(this.gravity);
+    let{x:dx,y:dy}=Vector.sub(mouse.pos,this.pos);
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const dir=new Vector(dx/dist,dy/dist);
+    const force=Math.max((mouse.radius-dist)/mouse.radius,0);
+    if(force>0.6)this.pos.setXY(mouse.pos.x,mouse.pos.y);
+    else{this.pos.add(vel);this.pos.add(dir.mult(force));}
+  }
+  drawLight(ctx){ctx.drawImage(this.lightImg,this.pos.x-this.lightSize/2,this.pos.y-this.lightSize/2,this.lightSize,this.lightSize)}
+  draw(ctx){ctx.fillStyle='#555';ctx.fillRect(this.pos.x-this.mass,this.pos.y-this.mass,this.mass*2,this.mass*2)}
+}
+
+// ─── Stick ────────────────────────────────────────────
+class Stick {
+  constructor(p1,p2){
+    this.startPoint=p1;this.endPoint=p2;
+    this.length=this.startPoint.pos.dist(this.endPoint.pos);this.tension=0.3;
+  }
+  update(){
+    const dx=this.endPoint.pos.x-this.startPoint.pos.x,dy=this.endPoint.pos.y-this.startPoint.pos.y;
+    const dist=Math.sqrt(dx*dx+dy*dy),diff=(dist-this.length)/dist;
+    const ox=diff*dx*this.tension,oy=diff*dy*this.tension;
+    const m=this.startPoint.mass+this.endPoint.mass;
+    const m1=this.endPoint.mass/m,m2=this.startPoint.mass/m;
+    if(!this.startPoint.pinned){this.startPoint.pos.x+=ox*m1;this.startPoint.pos.y+=oy*m1;}
+    if(!this.endPoint.pinned){this.endPoint.pos.x-=ox*m2;this.endPoint.pos.y-=oy*m2;}
+  }
+  draw(ctx){
+    ctx.beginPath();ctx.strokeStyle='rgba(232,163,23,0.32)';ctx.lineWidth=1.15;
+    ctx.moveTo(this.startPoint.pos.x,this.startPoint.pos.y);
+    ctx.lineTo(this.endPoint.pos.x,this.endPoint.pos.y);
+    ctx.stroke();ctx.closePath();
+  }
+}
+
+// ─── Rope ────────────────────────────────────────────
+class Rope {
+  constructor(cfg){
+    this.x=cfg.x;this.y=cfg.y;this.segments=cfg.segments||10;
+    this.gap=cfg.gap||15;this.dots=[];this.sticks=[];this.iterations=10;this.create();
+  }
+  pin(i){this.dots[i].pinned=true}
+  create(){
+    for(let i=0;i<this.segments;i++)this.dots.push(new Dot(this.x,this.y+i*this.gap));
+    for(let i=0;i<this.segments-1;i++)this.sticks.push(new Stick(this.dots[i],this.dots[i+1]));
+  }
+  update(mouse){
+    this.dots.forEach(d=>d.update(mouse));
+    for(let i=0;i<this.iterations;i++)this.sticks.forEach(s=>s.update());
+  }
+  draw(ctx){
+    this.sticks.forEach(s=>s.draw(ctx));
+    this.dots[this.dots.length-1].drawLight(ctx);
+  }
+}
+
+// ─── App ─────────────────────────────────────────────
+class App {
+  static width=innerWidth;static height=innerHeight;
+  static dpr=devicePixelRatio>1?2:1;static interval=1000/60;
+  constructor(){
+    this.canvas=document.querySelector('canvas');
+    this.ctx=this.canvas.getContext('2d');
+    this.mouse=new Mouse(this.canvas);
+    this.resize();
+    window.addEventListener('resize',this.resize.bind(this));
+    this.createRopes();
+  }
+  createRopes(){
+    this.ropes=[];
+    const TOTAL = Math.max(16, Math.min(100, Math.floor(App.width / 28)));
+    const margin = 8;
+    const usable = Math.max(40, App.width - margin * 2);
+    for (let i = 0; i < TOTAL; i++) {
+      const t = (i + 0.5) / TOTAL;
+      const jitter = rnd(-usable * 0.02, usable * 0.02);
+      const x = margin + t * usable + jitter;
+      const gap = rnd(App.height * 0.045, App.height * 0.095);
+      const segments = Math.max(8, Math.min(14, Math.floor(App.height / 90)));
+      const rope = new Rope({ x, y: 0, gap, segments });
+      rope.pin(0);
+      this.ropes.push(rope);
+    }
+  }
+  resize(){
+    App.width=innerWidth;App.height=innerHeight;
+    this.canvas.style.width='100%';this.canvas.style.height='100%';
+    const w = Math.floor(App.width * App.dpr);
+    const h = Math.floor(App.height * App.dpr);
+    this.canvas.width = w;
+    this.canvas.height = h;
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.scale(App.dpr, App.dpr);
+    this.createRopes();
+  }
+  render(){
+    let then=Date.now();
+    const frame=()=>{
+      requestAnimationFrame(frame);
+      const now=Date.now(),delta=now-then;
+      if(delta<App.interval)return;
+      then=now-(delta%App.interval);
+      this.ctx.clearRect(0,0,App.width,App.height);
+      this.ropes.forEach(r=>{r.update(this.mouse);r.draw(this.ctx);});
+    };
+    requestAnimationFrame(frame);
+  }
+}
+
+function rnd(min,max){return Math.random()*(max-min)+min}
+window.addEventListener('load',()=>{const app=new App();app.render();});
+
+// ─── Auth UI toggle (sliding panels) ─────────────────
+const authContainer = document.getElementById('container');
+const registerBtn = document.getElementById('register');
+const loginBtn = document.getElementById('login');
+const mobileToggle = document.getElementById('mobile-toggle-auth');
+const mobileSwitchLabel = document.getElementById('mobile-switch-label');
+
+function setMobileSwitchText() {
+  if (!mobileToggle || !mobileSwitchLabel) return;
+  const active = authContainer.classList.contains('active');
+  mobileSwitchLabel.textContent = active ? 'Already have an account?' : 'New here?';
+  mobileToggle.textContent = active ? 'Sign in' : 'Create an account';
+}
+
+registerBtn.addEventListener('click', () => {
+  authContainer.classList.add('active');
+  setMobileSwitchText();
+});
+loginBtn.addEventListener('click', () => {
+  authContainer.classList.remove('active');
+  setMobileSwitchText();
+});
+
+if (mobileToggle) {
+  mobileToggle.addEventListener('click', () => {
+    authContainer.classList.toggle('active');
+    setMobileSwitchText();
+  });
+}
+setMobileSwitchText();
+
+async function socialAuth(provider) {
+  const errLogin = document.getElementById('login-error');
+  const errReg = document.getElementById('reg-error');
+  if (errLogin) errLogin.textContent = '';
+  if (errReg) errReg.textContent = '';
+  try {
+    const r = await fetch('/api/auth/social', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider })
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      const msg = d.message || 'Sign-in failed.';
+      if (authContainer.classList.contains('active')) errReg.textContent = msg;
+      else errLogin.textContent = msg;
+      return;
+    }
+    localStorage.setItem('spotyy_token', d.token);
+    localStorage.setItem('spotyy_user', JSON.stringify(d.user));
+    window.location.href = '/app.html';
+  } catch (e) {
+    const msg = 'Server unreachable. Try again.';
+    if (authContainer.classList.contains('active')) errReg.textContent = msg;
+    else errLogin.textContent = msg;
+  }
+}
+
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  const err=document.getElementById('login-error');
+  err.textContent='';
+  if(!email||!pass){err.textContent='Please fill in all fields.';return;}
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
+    const d=await r.json();
+    if(!r.ok){err.textContent=d.message||'Login failed.';return;}
+    localStorage.setItem('spotyy_token',d.token);
+    localStorage.setItem('spotyy_user',JSON.stringify(d.user));
+    window.location.href='/app.html';
+  }catch(e){err.textContent='Server unreachable. Try again.';}
+}
+
+async function doRegister(){
+  const name=document.getElementById('reg-name').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const pass=document.getElementById('reg-pass').value;
+  const err=document.getElementById('reg-error');
+  err.textContent='';
+  if(!name||!email||!pass){err.textContent='Please fill in all fields.';return;}
+  if(pass.length<6){err.textContent='Password must be at least 6 characters.';return;}
+  try{
+    const r=await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password:pass})});
+    const d=await r.json();
+    if(!r.ok){err.textContent=d.message||'Registration failed.';return;}
+    localStorage.setItem('spotyy_token',d.token);
+    localStorage.setItem('spotyy_user',JSON.stringify(d.user));
+    window.location.href='/app.html';
+  }catch(e){err.textContent='Server unreachable. Try again.';}
+}
+
+// Enter key support
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter')return;
+  const c=document.getElementById('container');
+  if(!c)return;
+  if(c.classList.contains('active'))doRegister();
+  else doLogin();
+});
+</script>
+</body>
+</html>
